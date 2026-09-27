@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise SOC SIEM & IDS Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <!-- Thêm thư viện Chart.js vẽ biểu đồ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen p-4">
+    <div class="max-w-[1700px] mx-auto space-y-4">
+        
+        <!-- HEADER -->
+        <div class="flex justify-between items-center bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xl">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-indigo-950 border border-indigo-500/30 rounded-lg">
+                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-wide text-slate-100">ENTERPRISE SOC SIEM & IDS COMMAND CENTER</h1>
+                    <p class="text-slate-400 text-xs">Giám sát Real-time, Biểu đồ Traffic & Tự động Chặn Tấn Công Tầng Mạng</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-xs">
+                    <span id="status-ping" class="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
+                    <span id="status-text" class="font-bold text-slate-400">OFFLINE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- METRICS CARDS -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="text-[10px] font-bold text-slate-400 uppercase">Sự Cố Đang Mở (Active)</div>
+                <div id="stat-active" class="text-2xl font-black text-red-500 font-mono mt-1">0</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="text-[10px] font-bold text-slate-400 uppercase">Gói Tin Đã Phân Tích</div>
+                <div id="stat-packets" class="text-2xl font-black text-sky-400 font-mono mt-1">0</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="text-[10px] font-bold text-slate-400 uppercase">Tấn Công Mức CRITICAL</div>
+                <div id="stat-critical" class="text-2xl font-black text-amber-500 font-mono mt-1">0</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                <div class="text-[10px] font-bold text-slate-400 uppercase">IP Đã Chặn (Blocked)</div>
+                <div id="stat-blocked" class="text-2xl font-black text-emerald-400 font-mono mt-1">0</div>
+            </div>
+        </div>
+
+        <!-- CHARTS SECTION (MỚI BỔ SUNG) -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Chart 1: Traffic PPS -->
+            <div class="lg:col-span-2 bg-slate-900 p-4 rounded-xl border border-slate-800 h-[220px]">
+                <div class="text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">⚡ Biểu Đồ Băng Thông Network Traffic (Packets / Second)</div>
+                <div class="h-[160px]">
+                    <canvas id="ppsChart"></canvas>
+                </div>
+            </div>
+            <!-- Chart 2: Threat Matrix Distribution -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-[220px]">
+                <div class="text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">🎯 Phân Bố Mối Đe Dọa (Threat Type)</div>
+                <div class="h-[160px] flex justify-center">
+                    <canvas id="threatChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROL PANEL -->
+        <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Card Mạng Giám Sát</label>
+                    <select id="select-dev" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-indigo-300"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Port Giám Sát (0 = All)</label>
+                    <input type="number" id="input-port" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-indigo-300">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Ngưỡng Báo Động (Pkts/s)</label>
+                    <input type="number" id="input-threshold" value="10" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-indigo-300">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Whitelist IP</label>
+                    <input type="text" id="input-whitelist" placeholder="192.168.1.1" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-indigo-300">
+                </div>
+            </div>
+            <div class="mt-3 flex justify-between items-center pt-2 border-t border-slate-800">
+                <div class="flex gap-2">
+                    <button onclick="startMonitoring()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-4 py-1.5 rounded-lg text-xs">▶ Start SOC Engine</button>
+                    <button onclick="stopMonitoring()" class="bg-slate-800 hover:bg-red-700 text-slate-200 font-bold px-4 py-1.5 rounded-lg text-xs">⏹ Stop</button>
+                </div>
+                <button onclick="exportCSV()" class="bg-emerald-800 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs">📥 Export SIEM Report (CSV)</button>
+            </div>
+        </div>
+
+        <!-- INCIDENT MANAGEMENT TABLE -->
+        <div class="bg-slate-900 rounded-xl border border-slate-800 h-[380px] flex flex-col">
+            <div class="p-3 border-b border-slate-800 flex justify-between items-center">
+                <h2 class="text-xs font-bold text-slate-200 uppercase tracking-widest">🚨 Bảng Điều Phối Sự Cố An Ninh (Active Incident Matrix)</h2>
+            </div>
+            <div class="overflow-y-auto flex-1 p-3">
+                <table class="w-full text-left font-mono text-xs">
+                    <thead>
+                        <tr class="text-slate-500 border-b border-slate-800 text-[10px] uppercase">
+                            <th class="pb-2">Level</th>
+                            <th class="pb-2">Loại Tấn Công</th>
+                            <th class="pb-2">IP Tấn Công</th>
+                            <th class="pb-2">Target Port</th>
+                            <th class="pb-2 text-center">Hits</th>
+                            <th class="pb-2 text-center">Peak Rate</th>
+                            <th class="pb-2">Thời Gian</th>
+                            <th class="pb-2 text-right">Hành Động Firewall</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incident-table-body" class="divide-y divide-slate-800/40">
+                        <tr><td colspan="8" class="text-center py-10 text-slate-600 italic">Hệ thống đang hoạt động an toàn...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let stompClient = null;
+        let totalPkts = 0, criticals = 0, blockedCount = 0;
+        const incidentsMap = new Map();
+        let ppsChart, threatChart;
+        let ppsCountCurrentSecond = 0;
+        const threatCounts = { "SYN Flood": 0, "Port Scan": 0, "ICMP Flood": 0 };
+
+        // Khởi tạo Biểu đồ Chart.js
+        function initCharts() {
+            const ctx1 = document.getElementById('ppsChart').getContext('2d');
+            ppsChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: Array(15).fill(''),
+                    datasets: [{
+                        label: 'Packets / Second',
+                        data: Array(15).fill(0),
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+
+            const ctx2 = document.getElementById('threatChart').getContext('2d');
+            threatChart = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['SYN Flood', 'Port Scan', 'ICMP Flood'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#ef4444', '#a855f7', '#f59e0b']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: '#94a3b8', font: { size: 10 } } } } }
+            });
+
+            // Vòng lặp cập nhật PPS Chart mỗi giây
+            setInterval(() => {
+                ppsChart.data.datasets[0].data.shift();
+                ppsChart.data.datasets[0].data.push(ppsCountCurrentSecond);
+                ppsChart.update();
+                ppsCountCurrentSecond = 0;
+            }, 1000);
+        }
+
+        window.onload = function() {
+            initCharts();
+            fetch('/api/config/interfaces').then(res => res.json()).then(data => {
+                const select = document.getElementById('select-dev');
+                select.innerHTML = '';
+                data.forEach(dev => select.innerHTML += `<option value="${dev.id}">${dev.description}</option>`);
+            });
+            connectWS();
+        };
+
+        function connectWS() {
+            const socket = new SockJS('/ws-ids');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+            stompClient.connect({}, function () {
+                document.getElementById('status-ping').className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                document.getElementById('status-text').innerText = "SOC ACTIVE";
+                document.getElementById('status-text').className = "font-bold text-emerald-400";
+
+                stompClient.subscribe('/topic/alerts', res => processAlert(JSON.parse(res.body)));
+                stompClient.subscribe('/topic/traffic', res => {
+                    totalPkts++;
+                    ppsCountCurrentSecond++;
+                    document.getElementById('stat-packets').innerText = totalPkts.toLocaleString();
+                });
+            });
+        }
+
+        function processAlert(alert) {
+            const key = `${alert.srcIp}_${alert.title}`;
+            
+            // Cập nhật Threat Chart Count
+            if (alert.title.includes("SYN")) threatCounts["SYN Flood"]++;
+            else if (alert.title.includes("Port")) threatCounts["Port Scan"]++;
+            else threatCounts["ICMP Flood"]++;
+            threatChart.data.datasets[0].data = [threatCounts["SYN Flood"], threatCounts["Port Scan"], threatCounts["ICMP Flood"]];
+            threatChart.update();
+
+            if (incidentsMap.has(key)) {
+                const inc = incidentsMap.get(key);
+                inc.hits++;
+                inc.lastSeen = alert.time;
+                if (alert.count > inc.peakRate) inc.peakRate = alert.count;
+            } else {
+                let severity = "HIGH";
+                let sevBadge = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+                if (alert.title.includes("SYN") || alert.title.includes("DoS")) {
+                    severity = "CRITICAL";
+                    sevBadge = "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse";
+                    criticals++;
+                    document.getElementById('stat-critical').innerText = criticals;
+                }
+
+                incidentsMap.set(key, {
+                    title: alert.title, srcIp: alert.srcIp, dstPort: alert.dstPort,
+                    severity: severity, sevBadge: sevBadge, hits: 1, peakRate: alert.count,
+                    lastSeen: alert.time, status: "ACTIVE"
+                });
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('incident-table-body');
+            tbody.innerHTML = '';
+            document.getElementById('stat-active').innerText = incidentsMap.size;
+
+            incidentsMap.forEach((inc, key) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 border-b border-slate-800/40";
+                tr.innerHTML = `
+                    <td class="py-2"><span class="px-2 py-0.5 rounded border text-[10px] font-bold ${inc.sevBadge}">${inc.severity}</span></td>
+                    <td class="py-2 font-bold text-slate-200">${inc.title}</td>
+                    <td class="py-2 text-red-400 font-bold">${inc.srcIp}</td>
+                    <td class="py-2 text-amber-300">${inc.dstPort}</td>
+                    <td class="py-2 text-center font-bold text-indigo-300">${inc.hits}</td>
+                    <td class="py-2 text-center font-bold text-red-400">${inc.peakRate} pkts/s</td>
+                    <td class="py-2 text-slate-400 text-[10px]">${inc.lastSeen}</td>
+                    <td class="py-2 text-right">
+                        ${inc.status === "ACTIVE" 
+                            ? `<button onclick="blockIpOnFirewall('${key}', '${inc.srcIp}')" class="bg-red-900/60 hover:bg-red-800 text-red-200 border border-red-700/50 px-2 py-1 rounded text-[10px] font-bold">🚫 Execute Firewall Block</button>`
+                            : `<span class="text-emerald-400 text-[10px] font-bold">✔ FIREWALL BLOCKED</span>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Gọi API Backend để chặn IP trên Windows Firewall
+        function blockIpOnFirewall(key, ip) {
+            fetch(`/api/config/block-ip?ip=${ip}`, { method: 'POST' })
+                .then(res => res.text())
+                .then(msg => {
+                    if (incidentsMap.has(key)) {
+                        incidentsMap.get(key).status = "BLOCKED";
+                        blockedCount++;
+                        document.getElementById('stat-blocked').innerText = blockedCount;
+                        renderTable();
+                    }
+                });
+        }
+
+        function startMonitoring() {
+            const devIndex = document.getElementById('select-dev').value;
+            fetch(`/api/config/start?devIndex=${devIndex}&port=${document.getElementById('input-port').value}&threshold=${document.getElementById('input-threshold').value}&whitelistIp=${document.getElementById('input-whitelist').value}`, { method: 'POST' });
+        }
+
+        function stopMonitoring() { fetch('/api/config/stop', { method: 'POST' }); }
+        function exportCSV() {
+            let csv = "Severity,Title,SrcIP,Port,Hits,PeakRate,LastSeen,Status\n";
+            incidentsMap.forEach(i => csv += `"${i.severity}","${i.title}","${i.srcIp}","${i.dstPort}","${i.hits}","${i.peakRate}","${i.lastSeen}","${i.status}"\n`);
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+            a.download = `SOC_Report_${Date.now()}.csv`; a.click();
+        }
+    </script>
+</body>
+</html>
