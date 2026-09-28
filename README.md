@@ -13,7 +13,7 @@ Spring Boot web application skeleton.
 mvn spring-boot:run
 ```
 
-The health endpoint is available at `http://localhost:8080/api/v1/health`.
+The health endpoint is available at `http://localhost:8080`.
 
 ## Test
 

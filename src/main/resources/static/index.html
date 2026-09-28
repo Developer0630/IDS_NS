@@ -97,6 +97,9 @@
                     <button onclick="stopMonitoring()" class="bg-slate-800 hover:bg-red-700 text-slate-200 font-bold px-4 py-1.5 rounded-lg text-xs">⏹ Stop</button>
                 </div>
                 <button onclick="exportCSV()" class="bg-emerald-800 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs">📥 Export SIEM Report (CSV)</button>
+                <button onclick="toggleRuleModal(true)" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold px-3 py-1.5 rounded-lg text-xs border border-indigo-500/30">
+                     Cấu Hình Rule Engine
+                </button>
             </div>
         </div>
 
@@ -127,6 +130,125 @@
         </div>
 
     </div>
+    <!-- MODAL 1: CẤU HÌNH QUY TẮC IDS (CUSTOM RULE ENGINE) -->
+<div id="rule-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl p-5 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                ⚙️ Quản Lý Quy Tắc Cảnh Báo (IDS Custom Rule Engine)
+            </h3>
+            <button onclick="toggleRuleModal(false)" class="text-slate-500 hover:text-slate-300 font-bold">✕</button>
+        </div>
+
+        <!-- Form Thêm Rule Mới -->
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-3">
+            <div class="text-[11px] font-bold text-indigo-400 uppercase">+ Thêm Rule Mới (Tương tự Snort/Suricata Format)</div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Tên Quy Tắc (Rule Name)</label>
+                    <input type="text" id="rule-name" placeholder="Ví dụ: SYN Flood Attack" class="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Giao Thức (Protocol)</label>
+                    <select id="rule-proto" class="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-200">
+                        <option value="TCP">TCP</option>
+                        <option value="UDP">UDP</option>
+                        <option value="ICMP">ICMP</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">TCP Flags (Nếu có)</label>
+                    <select id="rule-flags" class="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-200">
+                        <option value="ANY">Bất kỳ (ANY)</option>
+                        <option value="SYN">SYN</option>
+                        <option value="ACK">ACK</option>
+                        <option value="FIN">FIN</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Ngưỡng (Threshold Pkts/s)</label>
+                    <input type="number" id="rule-threshold" value="30" class="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Cấp Độ (Severity)</label>
+                    <select id="rule-severity" class="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-slate-200">
+                        <option value="CRITICAL">CRITICAL</option>
+                        <option value="HIGH">HIGH</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="addRule()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded transition">Lưu Rule</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh sách Rule Đang Kích Hoạt -->
+        <div class="space-y-2 max-h-48 overflow-y-auto">
+            <div class="text-[11px] font-bold text-slate-400 uppercase">Danh Sách Rule Đang Hoạt Động</div>
+            <table class="w-full text-left text-xs font-mono">
+                <thead>
+                    <tr class="text-slate-500 border-b border-slate-800 text-[10px]">
+                        <th class="pb-1">Rule Name</th>
+                        <th class="pb-1">Condition</th>
+                        <th class="pb-1">Threshold</th>
+                        <th class="pb-1">Severity</th>
+                        <th class="pb-1 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="rule-list-body" class="divide-y divide-slate-800/60">
+                    <!-- Rule items render bằng JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 2: CHI TIẾT SỰ CỐ & SOC ANALYST NOTES (AUDIT LOG) -->
+<div id="incident-detail-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-3xl p-5 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div>
+                <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    📋 SOC Incident Investigation & Audit Trail
+                </h3>
+                <p id="modal-incident-key" class="text-xs font-mono text-red-400 mt-0.5"></p>
+            </div>
+            <button onclick="toggleIncidentModal(false)" class="text-slate-500 hover:text-slate-300 font-bold">✕</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-xs font-mono">
+            <!-- Payload Info -->
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
+                <div class="font-bold text-sky-400 uppercase text-[10px]">🔎 Traffic Deep Packet Inspection</div>
+                <div class="text-slate-300"><strong>Attacker IP:</strong> <span id="modal-src-ip" class="text-red-400"></span></div>
+                <div class="text-slate-300"><strong>Target Port:</strong> <span id="modal-port"></span></div>
+                <div class="text-slate-300"><strong>Peak Packet Rate:</strong> <span id="modal-rate" class="text-amber-400"></span></div>
+                <div class="text-slate-300"><strong>Protocol / Flags:</strong> <span class="text-indigo-400">TCP / [SYN, ECN]</span></div>
+                <div class="text-slate-300"><strong>Sample Payload Header:</strong></div>
+                <div class="bg-slate-900 p-2 rounded text-[10px] text-slate-500 font-mono overflow-x-auto">
+                    4500 003c 1c46 4000 4006 b1e6 c0a8 0102...
+                </div>
+            </div>
+
+            <!-- Analyst Notes & Audit Logs -->
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 flex flex-col justify-between space-y-2">
+                <div>
+                    <div class="font-bold text-amber-400 uppercase text-[10px] mb-1">📝 Nhật Ký Xử Lý (SOC Audit Notes)</div>
+                    <div id="analyst-notes-list" class="space-y-1.5 max-h-36 overflow-y-auto text-[11px] text-slate-300">
+                        <!-- Notes render ở đây -->
+                    </div>
+                </div>
+                <div class="space-y-2 pt-2 border-t border-slate-800">
+                    <textarea id="input-new-note" rows="2" placeholder="Nhập ghi chú xử lý (Ví dụ: False Positive, đã Whitelist)..." class="w-full bg-slate-900 border border-slate-800 rounded p-2 text-xs text-slate-200 focus:outline-none"></textarea>
+                    <button onclick="saveAnalystNote()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-1.5 rounded text-xs">➕ Thêm Ghi Chú Audit Log</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
     <script>
         let stompClient = null;
@@ -135,7 +257,110 @@
         let ppsChart, threatChart;
         let ppsCountCurrentSecond = 0;
         const threatCounts = { "SYN Flood": 0, "Port Scan": 0, "ICMP Flood": 0 };
+        // --- LOGIC QUẢN LÝ RULE ENGINE (CLIENT-SIDE / REST API) ---
+let rulesList = [
+    { id: 1, name: "SYN Flood Attack", proto: "TCP", flags: "SYN", threshold: 10, severity: "CRITICAL" },
+    { id: 2, name: "Port Scanning Behavior", proto: "TCP", flags: "ANY", threshold: 20, severity: "MEDIUM" }
+];
 
+function toggleRuleModal(show) {
+    document.getElementById('rule-modal').classList.toggle('hidden', !show);
+    if(show) renderRules();
+}
+
+function renderRules() {
+    const tbody = document.getElementById('rule-list-body');
+    tbody.innerHTML = '';
+    rulesList.forEach(r => {
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-800/30">
+                <td class="py-1 font-bold text-slate-200">${r.name}</td>
+                <td class="py-1 text-slate-400">${r.proto} [${r.flags}]</td>
+                <td class="py-1 text-amber-400 font-bold">${r.threshold} pkts/s</td>
+                <td class="py-1"><span class="text-[10px] font-bold text-red-400">${r.severity}</span></td>
+                <td class="py-1 text-right">
+                    <button onclick="deleteRule(${r.id})" class="text-red-500 hover:text-red-400 font-bold">Xóa</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function addRule() {
+    const name = document.getElementById('rule-name').value;
+    if(!name) return alert("Vui lòng nhập tên Rule!");
+    
+    const newRule = {
+        id: Date.now(),
+        name: name,
+        proto: document.getElementById('rule-proto').value,
+        flags: document.getElementById('rule-flags').value,
+        threshold: parseInt(document.getElementById('rule-threshold').value),
+        severity: document.getElementById('rule-severity').value
+    };
+    
+    try {
+        const response = await fetch('/api/rules/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newRule)
+        });
+
+        if (response.ok) {
+            rulesList.push(newRule);
+            renderRules();
+            document.getElementById('rule-name').value = ''; // Reset input
+        } else {
+            alert("Lỗi khi lưu Rule xuống Backend!");
+        }
+    } catch (err) {
+        console.error("Failed to add rule:", err);
+    }
+}
+
+function deleteRule(id) {
+    rulesList = rulesList.filter(r => r.id !== id);
+    renderRules();
+}
+
+// --- LOGIC SOC ANALYST NOTES & AUDIT TRAIL ---
+let currentSelectedIncidentKey = null;
+
+function toggleIncidentModal(show, key = null) {
+    document.getElementById('incident-detail-modal').classList.toggle('hidden', !show);
+    if(show && key && incidentsMap.has(key)) {
+        currentSelectedIncidentKey = key;
+        const inc = incidentsMap.get(key);
+        
+        document.getElementById('modal-incident-key').innerText = `Incident ID: ${key}`;
+        document.getElementById('modal-src-ip').innerText = inc.srcIp;
+        document.getElementById('modal-port').innerText = inc.dstPort;
+        document.getElementById('modal-rate').innerText = `${inc.peakRate} pkts/s`;
+        
+        if(!inc.notes) inc.notes = [`[SYSTEM ${inc.lastSeen}] Detected threat ${inc.title}`];
+        renderNotes(inc.notes);
+    }
+}
+
+function renderNotes(notes) {
+    const list = document.getElementById('analyst-notes-list');
+    list.innerHTML = '';
+    notes.forEach(note => {
+        list.innerHTML += `<div class="p-1.5 bg-slate-900 rounded border border-slate-800/80">${note}</div>`;
+    });
+}
+
+function saveAnalystNote() {
+    const noteText = document.getElementById('input-new-note').value;
+    if(!noteText || !currentSelectedIncidentKey) return;
+    
+    const inc = incidentsMap.get(currentSelectedIncidentKey);
+    const timestamp = new Date().toLocaleTimeString();
+    inc.notes.push(`[ANALYST ${timestamp}] ${noteText}`);
+    
+    document.getElementById('input-new-note').value = '';
+    renderNotes(inc.notes);
+}
         // Khởi tạo Biểu đồ Chart.js
         function initCharts() {
             const ctx1 = document.getElementById('ppsChart').getContext('2d');
@@ -206,38 +431,45 @@
         }
 
         function processAlert(alert) {
-            const key = `${alert.srcIp}_${alert.title}`;
-            
-            // Cập nhật Threat Chart Count
-            if (alert.title.includes("SYN")) threatCounts["SYN Flood"]++;
-            else if (alert.title.includes("Port")) threatCounts["Port Scan"]++;
-            else threatCounts["ICMP Flood"]++;
-            threatChart.data.datasets[0].data = [threatCounts["SYN Flood"], threatCounts["Port Scan"], threatCounts["ICMP Flood"]];
-            threatChart.update();
+    const key = `${alert.srcIp}_${alert.title}`;
+    
+    // Tự động phân loại Threat linh hoạt
+    const threatType = alert.title.includes("SYN") ? "SYN Flood" 
+                     : alert.title.includes("Port") ? "Port Scan" 
+                     : alert.title.includes("ICMP") ? "ICMP Flood" 
+                     : "Other Threat";
 
-            if (incidentsMap.has(key)) {
-                const inc = incidentsMap.get(key);
-                inc.hits++;
-                inc.lastSeen = alert.time;
-                if (alert.count > inc.peakRate) inc.peakRate = alert.count;
-            } else {
-                let severity = "HIGH";
-                let sevBadge = "bg-amber-500/20 text-amber-400 border-amber-500/30";
-                if (alert.title.includes("SYN") || alert.title.includes("DoS")) {
-                    severity = "CRITICAL";
-                    sevBadge = "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse";
-                    criticals++;
-                    document.getElementById('stat-critical').innerText = criticals;
-                }
+    threatCounts[threatType] = (threatCounts[threatType] || 0) + 1;
+    
+    // Cập nhật Chart
+    threatChart.data.labels = Object.keys(threatCounts);
+    threatChart.data.datasets[0].data = Object.values(threatCounts);
+    threatChart.update();
 
-                incidentsMap.set(key, {
-                    title: alert.title, srcIp: alert.srcIp, dstPort: alert.dstPort,
-                    severity: severity, sevBadge: sevBadge, hits: 1, peakRate: alert.count,
-                    lastSeen: alert.time, status: "ACTIVE"
-                });
-            }
-            renderTable();
+    // Logic xử lý Incident Map giữ nguyên...
+    if (incidentsMap.has(key)) {
+        const inc = incidentsMap.get(key);
+        inc.hits++;
+        inc.lastSeen = alert.time;
+        if (alert.count > inc.peakRate) inc.peakRate = alert.count;
+    } else {
+        let severity = "HIGH";
+        let sevBadge = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+        if (alert.title.includes("SYN") || alert.title.includes("DoS")) {
+            severity = "CRITICAL";
+            sevBadge = "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse";
+            criticals++;
+            document.getElementById('stat-critical').innerText = criticals;
         }
+
+        incidentsMap.set(key, {
+            title: alert.title, srcIp: alert.srcIp, dstPort: alert.dstPort,
+            severity: severity, sevBadge: sevBadge, hits: 1, peakRate: alert.count,
+            lastSeen: alert.time, status: "ACTIVE"
+        });
+    }
+    renderTable();
+}
 
         function renderTable() {
             const tbody = document.getElementById('incident-table-body');
@@ -262,6 +494,12 @@
                         }
                     </td>
                 `;
+                tr.onclick = (e) => {
+                    // Nếu click không phải là nút Block IP thì mở Modal Incident Detail
+                    if (e.target.tagName !== 'BUTTON') {
+                        toggleIncidentModal(true, key);
+                    }
+                };
                 tbody.appendChild(tr);
             });
         }

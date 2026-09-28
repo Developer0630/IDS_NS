@@ -1,8 +1,9 @@
-package com.ltm.ids.exception;
+package com.ltm.ids.repository;
 
-import com.ltm.ids.dto.ApiResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.ltm.ids.dto.ApiResponse;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
